@@ -56,7 +56,7 @@ class _HomePageState extends State<HomePage> {
   onSelect(model) {
     // loadModel(model);
     final route = MaterialPageRoute(builder: (context) {
-      return DetectScreen(cameras: cameras, model: 'yolov7');
+      return DetectScreen(cameras: cameras, model: model);
     });
     Navigator.of(context).push(route);
   }
@@ -77,21 +77,21 @@ class _HomePageState extends State<HomePage> {
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
             ElevatedButton(
-              child: const Text(ssd),
-              onPressed: () => onSelect(ssd),
+              child: const Text("Start"),
+              onPressed: () => onSelect('yolov7'),
             ),
-            ElevatedButton(
-              child: const Text(yolo),
-              onPressed: () => onSelect(yolo),
-            ),
-            ElevatedButton(
-              child: const Text(mobilenet),
-              onPressed: () => onSelect(mobilenet),
-            ),
-            ElevatedButton(
-              child: const Text(posenet),
-              onPressed: () => onSelect(posenet),
-            ),
+            // ElevatedButton(
+            //   child: const Text(yolo),
+            //   onPressed: () => onSelect(yolo),
+            // ),
+            // ElevatedButton(
+            //   child: const Text(mobilenet),
+            //   onPressed: () => onSelect(mobilenet),
+            // ),
+            // ElevatedButton(
+            //   child: const Text(posenet),
+            //   onPressed: () => onSelect(posenet),
+            // ),
           ],
         ),
       ),
