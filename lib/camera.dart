@@ -27,14 +27,14 @@ class Camera extends StatefulWidget {
 class _CameraState extends State<Camera> {
   late CameraController controller;
   late IsolateInterpreter _interpreter;
-  
+  Uint8List? _paddedImage;
   bool isDetecting = false;
 
   Future<void> loadInterpreter() async {
     try {
-      var interpreterOptions = InterpreterOptions()..threads = 2;
+      var interpreterOptions = InterpreterOptions()..threads = 4;
       // interpreterOptions = InterpreterOptions()..useNnApiForAndroid = true;
-      // interpreterOptions = InterpreterOptions()..addDelegate(GpuDelegateV2());
+      // interpreterOptions = InterpreterOptions()..addDelegate(NnA);
       final interpreter = await Interpreter.fromAsset('assets/yolov7.tflite', options: interpreterOptions); // Load the model from assets
       _interpreter =
         await IsolateInterpreter.create(address: interpreter.address);
@@ -43,7 +43,6 @@ class _CameraState extends State<Camera> {
       print("Failed to load the interpreter: $e");
     }
   }
-
 
     img.Image drawBoundingBoxWithLabel(
     img.Image image,
@@ -76,7 +75,6 @@ class _CameraState extends State<Camera> {
   bool scaleUp = true,
   int stride = 32,
 }) {
-
   int currentWidth = image.width;
   int currentHeight = image.height;
 
@@ -97,17 +95,19 @@ class _CameraState extends State<Camera> {
     dw = dw % stride;
     dh = dh % stride;
   }
-
-  int padLeft = dw ~/ 2;
-  int padRight = dw - padLeft;
-  int padTop = dh ~/ 2;
-  int padBottom = dh - padTop;
+  dw = dw ~/ 2;
+  dh =  dh ~/ 2;
+  int padLeft = dw;
+  // int padRight = dw - padLeft;
+  int padTop = dh;
+  // int padBottom = dh - padTop;
 
   // Resize the image to the new dimensions
   img.Image resizedImage = img.copyResize(
     image,
     width: newUnpaddedWidth,
     height: newUnpaddedHeight,
+    interpolation: img.Interpolation.linear
   );
 
   // Create a new image with the specified padding color
@@ -115,21 +115,28 @@ class _CameraState extends State<Camera> {
     newSize.width.toInt(),
     newSize.height.toInt(),
   );
+  
 
   // Fill the padded image with the specified color
-  img.fill(
+  paddedImage = img.fill(
     paddedImage,
     img.getColor(padColor.red, padColor.green, padColor.blue, padColor.alpha),
   );
 
   // Copy the resized image onto the center of the padded image
-  img.copyInto(
+  paddedImage = img.copyInto(
     paddedImage,
     resizedImage,
     dstX: padLeft,
     dstY: padTop,
     blend: false, // Set blend to false to avoid blending issues
   );
+
+
+  // setState(() {
+  //   _paddedImage = Uint8List.fromList(img.encodePng(paddedImage));
+  // });
+
 
   List<List<List<double>>> tensor = List.generate(
     3,
@@ -152,36 +159,6 @@ class _CameraState extends State<Camera> {
   // Return the padded image as a Uint8List (PNG format)
   return [tensor, ratio, dw,dh];
 }
-  Map<String, Color> generateUniqueColorMap(List<String> names) {
-    final Map<String, Color> colorMap = {};
-
-    // Using a consistent seed for consistent results
-    final random = math.Random(0);
-
-    for (String name in names) {
-      // Generate a random color
-      Color newColor = Color.fromARGB(
-        255,
-        random.nextInt(256),
-        random.nextInt(256),
-        random.nextInt(256),
-      );
-
-      // Ensure the color is unique
-      while (colorMap.containsValue(newColor)) {
-        newColor = Color.fromARGB(
-          255,
-          random.nextInt(256),
-          random.nextInt(256),
-          random.nextInt(256),
-        );
-      }
-
-      colorMap[name] = newColor;
-    }
-
-    return colorMap;
-  }
 
   Future<List<dynamic>> runInference(img.Image image) async {
   
@@ -193,7 +170,8 @@ class _CameraState extends State<Camera> {
     // for(var byte in byteList){
         print(image.height);
         print(image.width);
-        var preprocessing = letterbox(image);
+        image = img.copyRotate(image, 90);
+        var preprocessing = letterbox(image, auto: false);
         var input = preprocessing[0];
         ratio = preprocessing[1];
         dw = preprocessing[2];
@@ -212,7 +190,6 @@ class _CameraState extends State<Camera> {
     await _interpreter.run(batch_images, output);
     stopwatch.stop(); // Stop the stopwatch
     print("Time taken: ${stopwatch.elapsed}" );
-
     List<String> names = ['020',
       '1',
       '10',
@@ -240,14 +217,15 @@ class _CameraState extends State<Camera> {
               "x": ((output[i][1]-dw)/ratio)/image.width,
               "y": ((output[i][2]-dh)/ratio)/image.height,
               "w": (((output[i][3]-dw)/ratio) - ((output[i][1]-dw)/ratio))/image.width,
-              "h": (((output[i][4]-dh)/ratio) - ( output[i][2]-dh)/ratio)/image.height,
+              "h": (((output[i][4]-dh)/ratio) - ((output[i][2]-dh)/ratio))/image.height,
           },
           "detectedClass" :  names[output[i][5].toInt()],
           "confidenceInClass" : output[i][6]
         });
+        
       }
     }
-
+    print(recognitions);
     return recognitions;
   }
 
@@ -306,7 +284,7 @@ Future<img.Image?> convertCameraImageToImage(CameraImage cameraImage) async {
     } else {
       controller = CameraController(
         widget.cameras[0],
-        ResolutionPreset.high,
+        ResolutionPreset.veryHigh,
       );
       controller.initialize().then((_) {
         if (!mounted) {
@@ -376,7 +354,7 @@ Future<img.Image?> convertCameraImageToImage(CameraImage cameraImage) async {
               ).then((recognitions) {
                 int endTime = DateTime.now().millisecondsSinceEpoch;
                 log("Detection took ${endTime - startTime}");
-
+                print(recognitions);
                 widget.setRecognitions(recognitions!, img.height, img.width);
 
                 isDetecting = false;
@@ -414,7 +392,12 @@ Future<img.Image?> convertCameraImageToImage(CameraImage cameraImage) async {
           screenRatio > previewRatio ? screenH : screenW / previewW * previewH,
       maxWidth:
           screenRatio > previewRatio ? screenH / previewH * previewW : screenW,
-      child: CameraPreview(controller),
+      child: Stack(
+        children: [
+          CameraPreview(controller),
+          SizedBox(width: 320, height: 320, child:(_paddedImage != null) ?  Image.memory(_paddedImage!):SizedBox()),
+        ],
+      ),
     );
   }
 }

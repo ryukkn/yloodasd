@@ -54,7 +54,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   onSelect(model) {
-    // loadModel(model);
+    loadModel(model);
     final route = MaterialPageRoute(builder: (context) {
       return DetectScreen(cameras: cameras, model: model);
     });
@@ -80,10 +80,10 @@ class _HomePageState extends State<HomePage> {
               child: const Text("Start"),
               onPressed: () => onSelect('yolov7'),
             ),
-            // ElevatedButton(
-            //   child: const Text(yolo),
-            //   onPressed: () => onSelect(yolo),
-            // ),
+            ElevatedButton(
+              child: const Text(yolo),
+              onPressed: () => onSelect(yolo),
+            ),
             // ElevatedButton(
             //   child: const Text(mobilenet),
             //   onPressed: () => onSelect(mobilenet),
