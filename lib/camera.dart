@@ -32,10 +32,12 @@ class _CameraState extends State<Camera> {
 
   Future<void> loadInterpreter() async {
     try {
-      var interpreterOptions = InterpreterOptions()..threads = 4;
+      var interpreterOptions = InterpreterOptions();
+      interpreterOptions.threads = 4;
       // interpreterOptions = InterpreterOptions()..useNnApiForAndroid = true;
       // interpreterOptions = InterpreterOptions()..addDelegate(NnA);
       final interpreter = await Interpreter.fromAsset('assets/yolov7.tflite', options: interpreterOptions); // Load the model from assets
+      interpreter.allocateTensors();
       _interpreter =
         await IsolateInterpreter.create(address: interpreter.address);
       print("Interpreter loaded successfully");
@@ -167,6 +169,9 @@ class _CameraState extends State<Camera> {
     var dw = 0;
     var dh = 0;
     var batch_images = [];
+     final stopwatch = Stopwatch(); // Create a stopwatch instance
+
+     stopwatch.start(); // Start the stopwatch
     // for(var byte in byteList){
         print(image.height);
         print(image.width);
@@ -178,14 +183,16 @@ class _CameraState extends State<Camera> {
         dh = preprocessing[3];
         batch_images.add(input);
     // }
-    print(batch_images.shape);
+    stopwatch.stop();
+    print("Preprocesising took ${stopwatch.elapsed}");
+    // print(batch_images.shape);
     // Prepare the output buffer with the expected shape (100, 7)
     var output =  List.generate(
               100,
               (l) => List.filled(7, 0.0), // 16 elements filled with 0.0
             );
     // Run inference
-    final stopwatch = Stopwatch(); // Create a stopwatch instance
+   
     stopwatch.start(); // Start the stopwatch
     await _interpreter.run(batch_images, output);
     stopwatch.stop(); // Stop the stopwatch
@@ -298,10 +305,14 @@ Future<img.Image?> convertCameraImageToImage(CameraImage cameraImage) async {
 
             int startTime = DateTime.now().millisecondsSinceEpoch;
             if(widget.model == 'yolov7'){
+                final stopwatch = Stopwatch(); // Create a stopwatch instance
+                stopwatch.start(); // Start the stopwatch
               convertCameraImageToImage(img).then((image){
+                stopwatch.stop();
+                print("Conversion took ${stopwatch.elapsed}");
                 runInference(image!).then((recognitions) {
                   int endTime = DateTime.now().millisecondsSinceEpoch;
-                  log("Detection took ${endTime - startTime}");
+                  log("Overall Detection took ${endTime - startTime}");
                   widget.setRecognitions(recognitions, img.height, img.width);
                   isDetecting=false;
                 });
